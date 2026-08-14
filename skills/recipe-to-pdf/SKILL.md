@@ -57,8 +57,34 @@ from the HTML. Warnings go to stderr.
 - Notes contain recipe notes, not comments or affiliate lists
 - `title` is the recipe name, not the page's SEO title
 
+Editorial calls that come up repeatedly:
+
+- **Keep instructions as one numbered list** unless the source truly separates them.
+  Steps often interleave (making filling while dough rests) or branch (bake today vs.
+  bake after an overnight chill). Grouping those implies an order that doesn't exist.
+  Ingredients having phases is not a reason to split the instructions.
+- **Resolve footnote markers.** An ingredient reading `yeast, optional*` points at a
+  link that doesn't exist on paper. Change it to `(see notes)` and make sure the note
+  it refers to is present.
+- **Trim promotion out of otherwise useful notes.** A tip that explains a substitution
+  and then pitches a product keeps the substitution and loses the pitch. Drop notes
+  that are only cross-links to other pages.
+
 If the page has no JSON-LD, the script emits a skeleton. Fetch the page and fill the
 JSON in by hand — many sites also have a `/print/` URL with far less markup.
+
+**When "Ingredient phase headings not detected" appears**, the site isn't using a known
+recipe plugin. The ingredients are still correct, just flat. Recover the phases from the
+page rather than guessing:
+
+```bash
+curl -sL -A "Mozilla/5.0" "<url>" -o /tmp/page.html
+rg -io '>\s*(Dough|Filling|Icing|Glaze|Topping|Sauce|Crust)\s*<' /tmp/page.html
+```
+
+Then find the repeated ingredient container (`ingredient-section`, `ingredients-group`)
+and count the items in each block to get the split. Confirm the counts add up to the
+flat list before editing the JSON — do not infer phases from the ingredients alone.
 
 **3. Build**
 

@@ -26,7 +26,8 @@ UA = (
 MARKERS = {
     "ingredients": r"tasty-recipes-ingredients|wprm-recipe-ingredients|mv-create-ingredients|recipe-ingredients",
     "instructions": r"tasty-recipes-instructions|wprm-recipe-instructions|mv-create-instructions|recipe-instructions",
-    "notes": r"tasty-recipes-notes|wprm-recipe-notes|mv-create-notes|recipe-notes",
+    "notes": r"tasty-recipes-notes|wprm-recipe-notes|mv-create-notes|recipe-notes"
+    r"|recipe__tips|recipe-tips|bakers-tips",
     "tail": r"tasty-recipes-equipment|tasty-recipes-other-details|tasty-recipes-nutrition"
     r"|tasty-recipes-source|wprm-recipe-equipment|wprm-recipe-nutrition"
     r"|comment-respond|comments-area|comment-list|entry-comments|^comments$"
@@ -79,6 +80,13 @@ def text_of(value) -> str:
                 if item.get(key):
                     return strip_tags(str(item[key]))
     return ""
+
+
+def descriptive_text(value) -> str:
+    """Pick the most informative of several values, e.g. "1 dozen rolls" over "12"."""
+    candidates = [strip_tags(item) for item in as_list(value) if isinstance(item, str)]
+    candidates = [candidate for candidate in candidates if candidate]
+    return max(candidates, key=len) if candidates else text_of(value)
 
 
 def humanize_duration(iso: str) -> str:
@@ -229,7 +237,7 @@ def build_details(recipe: dict, displayed: dict) -> dict:
     details.update(extra_times)
 
     for label, fallback in (
-        ("Yield", text_of(recipe.get("recipeYield"))),
+        ("Yield", descriptive_text(recipe.get("recipeYield"))),
         ("Category", text_of(recipe.get("recipeCategory"))),
         ("Method", text_of(recipe.get("cookingMethod"))),
         ("Cuisine", text_of(recipe.get("recipeCuisine"))),
@@ -259,8 +267,13 @@ def extract(url: str, raw_html: str) -> dict:
         if ingredients:
             print("Ingredient phase headings not detected; check the page.", file=sys.stderr)
 
-    note_groups = grouped_items(slice_section(html, "notes", ["tail"], limit=15000))
-    notes = [item for group in note_groups for item in group["items"]]
+    # Stop at the first newly-titled group: that is a different section (site
+    # navigation, "Baker's Resources"), not more notes.
+    notes = []
+    for index, group in enumerate(grouped_items(slice_section(html, "notes", ["tail"], limit=15000))):
+        if index and group["heading"]:
+            break
+        notes.extend(group["items"])
 
     return {
         "title": text_of(recipe.get("name")) or "Untitled Recipe",
